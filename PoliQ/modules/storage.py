@@ -2,52 +2,76 @@
 """
 storage.py
 Modul untuk membaca dan menyimpan data pasien PoliQ.
+Menggunakan file CSV.
 """
 
-import json
+import csv
 from pathlib import Path
 
-# Menentukan lokasi file pasien.json
-DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "pasien.json"
+# Menentukan lokasi file pasien.csv
+DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "pasien.csv"
+
+# Menentukan kolom data pasien
+FIELDNAMES = [
+    "id",
+    "nomor_antrian",
+    "tanggal",
+    "waktu_daftar",
+    "nama",
+    "keluhan",
+    "status",
+    "waktu_mulai",
+    "waktu_selesai",
+    "durasi"
+]
 
 
 def load_data():
     """
-    Membaca data pasien dari file JSON.
+    Membaca data pasien dari file CSV.
     """
 
     try:
-        # Membuka file dalam mode membaca
-        with open(DATA_FILE, "r", encoding="utf-8") as file:
-            data = json.load(file)
+        with open(DATA_FILE, "r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            data = list(reader)
 
-        # Memastikan data berbentuk list
-        if not isinstance(data, list):
-            raise ValueError("Format data pasien tidak valid.")
+        # Mengubah durasi menjadi angka
+        for pasien in data:
+            pasien["durasi"] = float(pasien["durasi"])
 
         return data
 
     except FileNotFoundError:
-        # Jika file belum ditemukan, mengembalikan list kosong
         return []
 
-    except json.JSONDecodeError:
-        # Jika isi file JSON rusak
-        raise ValueError("File pasien.json tidak dapat dibaca.")
+    except (csv.Error, ValueError, KeyError) as error:
+        raise ValueError("File pasien.csv tidak valid.") from error
 
 
 def save_data(data):
     """
-    Menyimpan data pasien ke dalam file JSON.
+    Menyimpan data pasien ke file CSV.
     """
 
-    # Memastikan data berbentuk list
     if not isinstance(data, list):
         raise ValueError("Data pasien harus berbentuk list.")
 
     # Membuat folder data jika belum tersedia
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # Membuka file dalam mode menulis
-    with open(DATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=4, ensure_ascii=False)
+    try:
+        with open(DATA_FILE, "w", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(
+                file,
+                fieldnames=FIELDNAMES
+            )
+
+            # Menulis judul kolom
+            writer.writeheader()
+
+            # Menulis seluruh data pasien
+            writer.writerows(data)
+
+    except (OSError, csv.Error) as error:
+        raise OSError("Gagal menyimpan data pasien.") from error

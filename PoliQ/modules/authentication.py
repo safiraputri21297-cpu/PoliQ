@@ -1,15 +1,19 @@
 
 """
 authentication.py
-Modul untuk mengelola akun dan proses login PoliQ.
+Modul untuk mengelola akun pengguna PoliQ.
+Menggunakan file CSV.
 """
 
-import json
+import csv
 from pathlib import Path
 from uuid import uuid4
 
 # Menentukan lokasi file akun
-ACCOUNT_FILE = Path(__file__).resolve().parent.parent / "data" / "akun.json"
+ACCOUNT_FILE = Path(__file__).resolve().parent.parent / "data" / "akun.csv"
+
+# Menentukan kolom akun
+FIELDNAMES = ["id", "nama", "username", "password", "role"]
 
 
 class Authentication:
@@ -18,48 +22,46 @@ class Authentication:
     """
 
     def __init__(self):
-        # Memuat data akun saat objek dibuat
         self.accounts = self.load_accounts()
 
     def load_accounts(self):
-        """
-        Membaca data akun dari file JSON.
-        """
+        """Membaca data akun dari file CSV."""
 
         try:
-            with open(ACCOUNT_FILE, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-            if not isinstance(data, list):
-                raise ValueError("Format data akun tidak valid.")
-
-            return data
+            with open(
+                ACCOUNT_FILE, "r", newline="", encoding="utf-8"
+            ) as file:
+                reader = csv.DictReader(file)
+                return list(reader)
 
         except FileNotFoundError:
             return []
 
-        except json.JSONDecodeError:
-            raise ValueError("File akun.json rusak.")
+        except csv.Error as error:
+            raise ValueError("File akun.csv tidak valid.") from error
 
     def save_accounts(self):
-        """
-        Menyimpan data akun ke file JSON.
-        """
+        """Menyimpan data akun ke file CSV."""
 
         ACCOUNT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(ACCOUNT_FILE, "w", encoding="utf-8") as file:
-            json.dump(
-                self.accounts,
-                file,
-                indent=4,
-                ensure_ascii=False
-            )
+        try:
+            with open(
+                ACCOUNT_FILE, "w", newline="", encoding="utf-8"
+            ) as file:
+                writer = csv.DictWriter(
+                    file,
+                    fieldnames=FIELDNAMES
+                )
+
+                writer.writeheader()
+                writer.writerows(self.accounts)
+
+        except (OSError, csv.Error) as error:
+            raise OSError("Gagal menyimpan akun.") from error
 
     def register(self, nama, username, password):
-        """
-        Mendaftarkan akun pasien baru.
-        """
+        """Mendaftarkan akun pasien baru."""
 
         nama = nama.strip()
         username = username.strip()
@@ -73,12 +75,11 @@ class Authentication:
         if len(password) < 6:
             raise ValueError("Password minimal 6 karakter.")
 
-        # Memeriksa apakah username sudah digunakan
+        # Memeriksa username yang sudah digunakan
         for akun in self.accounts:
             if akun["username"].lower() == username.lower():
                 raise ValueError("Username sudah digunakan.")
 
-        # Membuat akun pasien baru
         akun_baru = {
             "id": str(uuid4()),
             "nama": nama,
@@ -93,12 +94,9 @@ class Authentication:
         return akun_baru
 
     def login(self, username, password):
-        """
-        Memeriksa username dan password pengguna.
-        """
+        """Memeriksa username dan password pengguna."""
 
         for akun in self.accounts:
-
             if (
                 akun["username"].lower() == username.strip().lower()
                 and akun["password"] == password
